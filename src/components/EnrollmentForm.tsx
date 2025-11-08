@@ -59,46 +59,19 @@ const EnrollmentForm = () => {
     setIsLoading(true);
     console.log("Form submitted:", data);
 
-    try {
-      const response = await fetch(
-        "https://aaqibabbas03.app.n8n.cloud/webhook-test/ea8546ad-fadc-4207-a41a-576ebcd7cb74",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          mode: "no-cors",
-          body: JSON.stringify({
-            ...data,
-            type: "form_submission",
-            timestamp: new Date().toISOString(),
-          }),
-        }
-      );
+    toast({
+      title: "Application Received! 📋",
+      description: "Now schedule your appointment in the calendar below.",
+    });
 
-      toast({
-        title: "Application Submitted Successfully! 🎉",
-        description: "Your information has been received. Now schedule your appointment below.",
-      });
-
-      setFormData(data);
-      setShowCalendar(true);
-    } catch (error) {
-      console.error("Error submitting form:", error);
-      toast({
-        title: "Submission Sent",
-        description: "Your application has been sent. Please schedule your appointment below.",
-      });
-      setFormData(data);
-      setShowCalendar(true);
-    } finally {
-      setIsLoading(false);
-    }
+    setFormData(data);
+    setShowCalendar(true);
+    setIsLoading(false);
   };
 
   const handleAppointmentConfirm = async () => {
     setIsConfirming(true);
-    console.log("Appointment confirmed");
+    console.log("Appointment confirmed with complete data");
 
     try {
       await fetch(
@@ -110,10 +83,14 @@ const EnrollmentForm = () => {
           },
           mode: "no-cors",
           body: JSON.stringify({
-            ...formData,
-            type: "appointment_scheduled",
-            appointmentConfirmed: true,
-            appointmentTimestamp: new Date().toISOString(),
+            studentName: formData?.studentName,
+            email: formData?.email,
+            phone: formData?.phone,
+            education: formData?.education,
+            interestedCourse: formData?.interestedCourse,
+            appointmentScheduled: true,
+            formSubmittedAt: new Date().toISOString(),
+            appointmentConfirmedAt: new Date().toISOString(),
           }),
         }
       );
