@@ -37,6 +37,9 @@ const courses = [
 const EnrollmentForm = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
+  const [isConfirming, setIsConfirming] = useState(false);
+  const [formData, setFormData] = useState<FormData | null>(null);
+  const [appointmentScheduled, setAppointmentScheduled] = useState(false);
   const { toast } = useToast();
 
   const {
@@ -67,6 +70,7 @@ const EnrollmentForm = () => {
           mode: "no-cors",
           body: JSON.stringify({
             ...data,
+            type: "form_submission",
             timestamp: new Date().toISOString(),
           }),
         }
@@ -77,6 +81,7 @@ const EnrollmentForm = () => {
         description: "Your information has been received. Now schedule your appointment below.",
       });
 
+      setFormData(data);
       setShowCalendar(true);
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -84,9 +89,65 @@ const EnrollmentForm = () => {
         title: "Submission Sent",
         description: "Your application has been sent. Please schedule your appointment below.",
       });
+      setFormData(data);
       setShowCalendar(true);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleAppointmentConfirm = async () => {
+    setIsConfirming(true);
+    console.log("Appointment confirmed");
+
+    try {
+      await fetch(
+        "https://aaqibabbas03.app.n8n.cloud/webhook-test/ea8546ad-fadc-4207-a41a-576ebcd7cb74",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          mode: "no-cors",
+          body: JSON.stringify({
+            ...formData,
+            type: "appointment_scheduled",
+            appointmentConfirmed: true,
+            appointmentTimestamp: new Date().toISOString(),
+          }),
+        }
+      );
+
+      toast({
+        title: "All Set! 🎉",
+        description: "Your appointment has been confirmed. We'll contact you shortly!",
+      });
+
+      setAppointmentScheduled(true);
+      setShowCalendar(false);
+      
+      // Reset form after 3 seconds
+      setTimeout(() => {
+        reset();
+        setAppointmentScheduled(false);
+        setFormData(null);
+      }, 3000);
+    } catch (error) {
+      console.error("Error confirming appointment:", error);
+      toast({
+        title: "Confirmation Received",
+        description: "Thank you! We've received your appointment confirmation.",
+      });
+      setAppointmentScheduled(true);
+      setShowCalendar(false);
+      
+      setTimeout(() => {
+        reset();
+        setAppointmentScheduled(false);
+        setFormData(null);
+      }, 3000);
+    } finally {
+      setIsConfirming(false);
     }
   };
 
@@ -103,7 +164,33 @@ const EnrollmentForm = () => {
             </p>
           </div>
 
-          {!showCalendar ? (
+          {appointmentScheduled ? (
+            <div className="text-center py-12 space-y-6">
+              <div className="w-20 h-20 mx-auto bg-secondary/20 rounded-full flex items-center justify-center">
+                <svg
+                  className="w-10 h-10 text-secondary"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-3xl font-bold text-foreground mb-3">
+                  Success! 🎉
+                </h3>
+                <p className="text-lg text-muted-foreground max-w-md mx-auto">
+                  Your application and appointment have been confirmed. Our team will reach out to you soon!
+                </p>
+              </div>
+            </div>
+          ) : !showCalendar ? (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="studentName">Student Name *</Label>
@@ -210,7 +297,7 @@ const EnrollmentForm = () => {
                 </p>
               </div>
 
-              <div className="rounded-xl overflow-hidden shadow-card-lg">
+              <div className="rounded-xl overflow-hidden shadow-card-lg border-2 border-primary/10">
                 <iframe
                   src="https://calendar.google.com/calendar/u/0/appointments/schedules/AcZssZ3PR-1ThwqqJ07Q1Ij4zFxoSYJhR6RktilNAnFvwFqTgPGZLUT7gQXRKQA1cdKIQg4g0f6Lon4D"
                   className="w-full h-[600px] border-0"
@@ -218,15 +305,39 @@ const EnrollmentForm = () => {
                 ></iframe>
               </div>
 
+              <div className="bg-accent/10 rounded-xl p-6 border-2 border-accent/20">
+                <p className="text-center text-foreground font-medium mb-4">
+                  After scheduling your appointment in the calendar above, click the button below to confirm:
+                </p>
+                <Button
+                  className="w-full h-12 text-lg font-semibold"
+                  onClick={handleAppointmentConfirm}
+                  disabled={isConfirming}
+                >
+                  {isConfirming ? (
+                    <>
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                      Confirming...
+                    </>
+                  ) : (
+                    <>
+                      <Calendar className="mr-2 h-5 w-5" />
+                      I've Scheduled My Appointment
+                    </>
+                  )}
+                </Button>
+              </div>
+
               <Button
                 variant="outline"
                 className="w-full h-12"
                 onClick={() => {
                   setShowCalendar(false);
+                  setFormData(null);
                   reset();
                 }}
               >
-                Submit Another Application
+                Go Back to Form
               </Button>
             </div>
           )}
