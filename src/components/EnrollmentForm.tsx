@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Calendar, Send } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const formSchema = z.object({
   studentName: z.string().min(2, "Name must be at least 2 characters").max(100),
@@ -39,6 +40,7 @@ const EnrollmentForm = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [isConfirming, setIsConfirming] = useState(false);
   const [formData, setFormData] = useState<FormData | null>(null);
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
   const [appointmentScheduled, setAppointmentScheduled] = useState(false);
   const { toast } = useToast();
 
@@ -59,14 +61,52 @@ const EnrollmentForm = () => {
     setIsLoading(true);
     console.log("Form submitted:", data);
 
-    toast({
-      title: "Application Received! 📋",
-      description: "Now schedule your appointment in the calendar below.",
-    });
+    try {
+      // Save to database
+      const { data: enrollment, error } = await supabase
+        .from("students_enrollments")
+        .insert({
+          student_name: data.studentName,
+          email: data.email,
+          phone: data.phone,
+          education: data.education,
+          interested_course: data.interestedCourse,
+          appointment_scheduled: false,
+          form_submitted_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-    setFormData(data);
-    setShowCalendar(true);
-    setIsLoading(false);
+      if (error) {
+        console.error("Database error:", error);
+        toast({
+          title: "Error",
+          description: "Failed to save your application. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      console.log("Enrollment saved to database:", enrollment);
+      setEnrollmentId(enrollment.id);
+
+      toast({
+        title: "Application Received! 📋",
+        description: "Now schedule your appointment in the calendar below.",
+      });
+
+      setFormData(data);
+      setShowCalendar(true);
+    } catch (error) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleAppointmentConfirm = async () => {
@@ -74,6 +114,24 @@ const EnrollmentForm = () => {
     console.log("Appointment confirmed with complete data");
 
     try {
+      // Update database record
+      if (enrollmentId) {
+        const { error: dbError } = await supabase
+          .from("students_enrollments")
+          .update({
+            appointment_scheduled: true,
+            appointment_confirmed_at: new Date().toISOString(),
+          })
+          .eq("id", enrollmentId);
+
+        if (dbError) {
+          console.error("Database update error:", dbError);
+        } else {
+          console.log("Database updated successfully");
+        }
+      }
+
+      // Send to webhook
       await fetch(
         "https://aaqibabbas03.app.n8n.cloud/webhook-test/ea8546ad-fadc-4207-a41a-576ebcd7cb74",
         {
@@ -89,6 +147,7 @@ const EnrollmentForm = () => {
             education: formData?.education,
             interestedCourse: formData?.interestedCourse,
             appointmentScheduled: true,
+            enrollmentId: enrollmentId,
             formSubmittedAt: new Date().toISOString(),
             appointmentConfirmedAt: new Date().toISOString(),
           }),
@@ -108,6 +167,7 @@ const EnrollmentForm = () => {
         reset();
         setAppointmentScheduled(false);
         setFormData(null);
+        setEnrollmentId(null);
       }, 3000);
     } catch (error) {
       console.error("Error confirming appointment:", error);
@@ -122,6 +182,7 @@ const EnrollmentForm = () => {
         reset();
         setAppointmentScheduled(false);
         setFormData(null);
+        setEnrollmentId(null);
       }, 3000);
     } finally {
       setIsConfirming(false);
@@ -311,6 +372,7 @@ const EnrollmentForm = () => {
                 onClick={() => {
                   setShowCalendar(false);
                   setFormData(null);
+                  setEnrollmentId(null);
                   reset();
                 }}
               >
